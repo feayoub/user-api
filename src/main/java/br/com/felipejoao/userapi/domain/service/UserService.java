@@ -65,8 +65,8 @@ public class UserService {
 
     public UserModel changePassword(Long userId, ChangePasswordModel changePasswordModel) {
         UserEntity user = repository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
-        validateMatchPassword(user.getPassword(), changePasswordModel.getOldPassword());
-        user.setPassword(changePasswordModel.getNewPassword());
+        validateMatchPassword(user.getPassword(), passwordEncoder.encode(changePasswordModel.getOldPassword()));
+        user.setPassword(passwordEncoder.encode(changePasswordModel.getNewPassword()));
         return toModel(repository.save(user));
     }
 
@@ -75,7 +75,7 @@ public class UserService {
         final String email = Optional.ofNullable(userModel.getEmail()).orElseThrow(() -> new BusinessException("E-mail is empty"));
         UserEntity user = repository.findByEmail(email).orElseThrow(() -> new EntityNotFoundException("User not found for e-mail: " + email));
         final String password = Optional.ofNullable(userModel.getPassword()).orElseThrow(() -> new BusinessException("Password is empty"));
-        validateMatchPassword(user.getPassword(), password);
+        validateMatchPassword(user.getPassword(), passwordEncoder.encode(password));
     }
 
     public void deleteById(Long id) {
