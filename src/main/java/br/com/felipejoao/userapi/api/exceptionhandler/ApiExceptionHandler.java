@@ -13,6 +13,7 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -27,6 +28,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     public ApiExceptionHandler(MessageSource messageSource) {
         this.messageSource = messageSource;
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Object> handleNotMappedException(Exception ex, WebRequest web) {
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
+
+        Problem problem = Problem.builder()
+                .title(ex.getMessage())
+                .status(status.value())
+                .dateTime(OffsetDateTime.now())
+                .build();
+
+        return handleExceptionInternal(ex, problem, new HttpHeaders(), status, web);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
