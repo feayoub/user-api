@@ -2,73 +2,79 @@ package br.com.felipejoao.userapi.api.controller;
 
 import br.com.felipejoao.userapi.api.model.ChangePasswordModel;
 import br.com.felipejoao.userapi.api.model.UserModel;
-import br.com.felipejoao.userapi.domain.entity.UserEntity;
 import br.com.felipejoao.userapi.domain.service.UserService;
-import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.persistence.EntityNotFoundException;
 import javax.validation.Valid;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin
+@CrossOrigin(origins = "http://localhost:3000")
 public class UserController {
     private final UserService userService;
-    private final ModelMapper modelMapper;
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserController.class);
 
     @Autowired
-    public UserController(UserService userService, ModelMapper modelMapper) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.modelMapper = modelMapper;
     }
 
     @GetMapping
-    public List<UserEntity> list() {
+    public List<UserModel> list() {
         return userService.findAll();
     }
 
     @GetMapping(value = "/{userId}")
-    public ResponseEntity<UserEntity> find(@PathVariable Long userId) {
-        UserEntity user = userService.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
+    public ResponseEntity<UserModel> find(@PathVariable Long userId) {
+        UserModel user = userService.findById(userId);
         return ResponseEntity.ok(user);
+    }
+
+    @GetMapping(value = "/{email}")
+    public ResponseEntity<UserModel> findByEmail(@PathVariable String email) {
+        UserModel user = userService.findByEmail(email);
+        return ResponseEntity.ok(user);
+    }
+
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> login(@RequestBody UserModel userModel) {
+        userService.login(userModel);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(code = HttpStatus.CREATED)
-    public UserEntity addNew(@Valid @RequestBody UserModel userModel) {
-        return userService.saveOrUpdate(toEntity(userModel));
+    public UserModel addNew(@Valid @RequestBody UserModel userModel) {
+        LOGGER.info("Recebendo requisição para criar novo usuário");
+        UserModel retUser = userService.saveOrUpdate(userModel);
+        LOGGER.info("Usuário criado com sucesso");
+        return retUser;
     }
 
     @PutMapping(value = "/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<UserEntity> update(@PathVariable Long userId, @Valid @RequestBody UserModel userModel) {
+    public ResponseEntity<UserModel> update(@PathVariable Long userId, @Valid @RequestBody UserModel userModel) {
         if(userService.notExistsById(userId)) {
             return ResponseEntity.notFound().build();
         }
         userModel.setId(userId);
 
-        return ResponseEntity.ok(userService.saveOrUpdate(toEntity(userModel)));
+        return ResponseEntity.ok(userService.saveOrUpdate(userModel));
     }
 
     @PatchMapping(value = "/{userId}", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<UserEntity> updatePassword(@PathVariable Long userId, @Valid @RequestBody ChangePasswordModel changePasswordModel) {
-        Optional<UserEntity> userOpt = userService.findById(userId);
-        if (userOpt.isEmpty()) {
+    public ResponseEntity<UserModel> updatePassword(@PathVariable Long userId, @Valid @RequestBody ChangePasswordModel changePasswordModel) {
+        if (userService.notExistsById(userId)) {
             return ResponseEntity.notFound().build();
         }
 
-        UserEntity user = userOpt.get();
-        userService.validateMatchPassword(user.getPassword(), changePasswordModel.getOldPassword());
-
-        user.setPassword(changePasswordModel.getNewPassword());
-
-        return ResponseEntity.ok(userService.saveOrUpdate(user));
+        return ResponseEntity.ok(userService.changePassword(userId, changePasswordModel));
     }
 
     @DeleteMapping(value = "/{userId}")
@@ -81,7 +87,10 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    private UserEntity toEntity(UserModel userModel) {
-        return modelMapper.map(userModel, UserEntity.class);
+    @DeleteMapping
+    public ResponseEntity<Void> deleteAll() {
+        userService.deleteAll();
+
+        return ResponseEntity.noContent().build();
     }
 }
